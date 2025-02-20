@@ -30,43 +30,31 @@ style_mapping = {
     '00_TEXT': '00_TEXT'
 }
 
-
-
-
-
-
+# Determine if a paragraph is part of a list
 def is_paragraph_in_list(paragraph):
     """Check if a paragraph is part of a bullet or numbered list by inspecting its XML properties."""
     num_pr = paragraph._p.xpath('.//w:numPr')
     return bool(num_pr)
 
-
-
-
+# Extract revision text
 def extract_revision_text(source_doc_path, first_cell_text="Revision History"):
 
-
     source_doc = Document(source_doc_path)
-
 
     for table in source_doc.tables:
         if table.cell(0, 0).text.strip() == first_cell_text:
             return [[cell.text.strip() for cell in row.cells] for row in table.rows]
-
 
     return None  # Return None if no matching table is found
 
-
+# Extract approval text
 def extract_approval_text(source_doc_path, first_cell_text="Approval Table"):
 
-
     source_doc = Document(source_doc_path)
-
 
     for table in source_doc.tables:
         if table.cell(0, 0).text.strip() == first_cell_text:
             return [[cell.text.strip() for cell in row.cells] for row in table.rows]
-
 
     return None  # Return None if no matching table is found
 
@@ -76,22 +64,29 @@ def extract_approval_text(source_doc_path, first_cell_text="Approval Table"):
 def extract_document_information(source_doc_path):
     doc = Document(source_doc_path)
 
+    header_content = None  
+    footer_content = None  
 
     # Locate header and footer
     for section in doc.sections:
         header = section.header
         footer = section.footer
 
-
         # Extract header
-        for table in header.tables:
-            header_content = [[cell.text.strip() for cell in row.cells] for row in table.rows]
-           
-       
-        # Extract footer
-        for table in footer.tables:
-            footer_content = [[cell.text.strip() for cell in row.cells] for row in table.rows]
+        try:
+            for table in header.tables:
+                header_content = [[cell.text.strip() for cell in row.cells] for row in table.rows]
+                break  # Exit loop if header content found
+        except:
+            pass  # Skip header extraction if it fails
 
+        # Extract footer
+        try:
+            for table in footer.tables:
+                footer_content = [[cell.text.strip() for cell in row.cells] for row in table.rows]
+                break  # Exit loop if footer content found
+        except:
+            pass  # Skip footer extraction if it fails
 
     return [header_content, footer_content]
 
