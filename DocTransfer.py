@@ -378,8 +378,8 @@ def write_content_with_existing_styles(content, destination_doc_path, finished_g
             style_name = style_mapping.get(item["style"], "00_TEXT")  # Default to '00_TEXT' if not mapped
             paragraph = dest_doc.add_paragraph(style=style_name)
 
-            # Handle list paragraphs
-            if item.get("is_list", False):
+            # Only apply list style if explicitly marked as a list and not a heading
+            if item.get("is_list", False) and "HEADING" not in style_name:
                 paragraph.style = "00_BULLET"  # Use mapped bullet list style
 
             # Write runs with formatting
