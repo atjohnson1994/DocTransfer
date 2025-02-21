@@ -223,50 +223,69 @@ def extract_images_from_docx(docx_path, output_dir):
 
 # (3.1) Input title, doc number, revision
 def input_document_information(finished_good, doc_information):
-    doc = Document(finished_good)
-
+    try:
+        doc = Document(finished_good)
+    except Exception as e:
+        print(f"Error opening document: {e}")
+        return
 
     # Locate header and footer
     for section in doc.sections:
         header = section.header
         footer = section.footer
 
+        try:
+            for table in header.tables:
+                try:
+                    cell_0_5 = table.cell(0, 5)
+                    cell_0_5.text = doc_information[0][0][5]
+                    apply_paragraph_style(cell_0_5.paragraphs[0], "00_BOLD")
+                    center_cell_content(cell_0_5)
+                except (IndexError, AttributeError) as e:
+                    print(f"Error setting header cell (0,5): {e}")
+                
+                try:
+                    cell_1_4 = table.cell(1, 4)
+                    cell_1_4.text = doc_information[0][1][4]
+                    apply_paragraph_style(cell_1_4.paragraphs[0], "00_BOLD")
+                    center_cell_content(cell_1_4)
+                except (IndexError, AttributeError) as e:
+                    print(f"Error setting header cell (1,4): {e}")
+                
+                try:
+                    cell_2_3 = table.cell(2, 3)
+                    cell_2_3.text = doc_information[0][2][3]
+                    apply_paragraph_style(cell_2_3.paragraphs[0], "00_HEADER")
+                    center_cell_content(cell_2_3)
+                except (IndexError, AttributeError) as e:
+                    print(f"Error setting header cell (2,3): {e}")
+                
+                try:
+                    cell_3_0 = table.cell(3, 0)
+                    cell_3_0.text = doc_information[0][3][0]
+                    apply_paragraph_style(cell_3_0.paragraphs[0], "00_HEADER TITLE")
+                    center_cell_content(cell_3_0)
+                except (IndexError, AttributeError) as e:
+                    print(f"Error setting header cell (3,0): {e}")
+        except Exception as e:
+            print(f"Error processing header tables: {e}")
 
-        for table in header.tables:
-            # Set text and apply styles without duplicating the content
-            cell_0_5 = table.cell(0, 5)
-            cell_0_5.text = doc_information[0][0][5]
-            apply_paragraph_style(cell_0_5.paragraphs[0], "00_BOLD")
-            center_cell_content(cell_0_5)
+        try:
+            for table in footer.tables:
+                try:
+                    cell_0_2 = table.cell(0, 2)
+                    cell_0_2.text = doc_information[1][0][2]
+                    apply_paragraph_style(cell_0_2.paragraphs[0], "00_BOLD")
+                    set_font_size(cell_0_2, 9)
+                except (IndexError, AttributeError) as e:
+                    print(f"Error setting footer cell (0,2): {e}")
+        except Exception as e:
+            print(f"Error processing footer tables: {e}")
 
-
-            cell_1_4 = table.cell(1, 4)
-            cell_1_4.text = doc_information[0][1][4]
-            apply_paragraph_style(cell_1_4.paragraphs[0], "00_BOLD")
-            center_cell_content(cell_1_4)
-
-
-            cell_2_3 = table.cell(2, 3)
-            cell_2_3.text = doc_information[0][2][3]
-            apply_paragraph_style(cell_2_3.paragraphs[0], "00_HEADER")
-            center_cell_content(cell_2_3)
-
-
-            cell_3_0 = table.cell(3, 0)
-            cell_3_0.text = doc_information[0][3][0]
-            apply_paragraph_style(cell_3_0.paragraphs[0], "00_HEADER TITLE")
-            center_cell_content(cell_3_0)
-
-        for table in footer.tables:
-            # Set text and apply styles without duplicating the content
-            cell_0_2 = table.cell(0, 2)
-            cell_0_2.text = doc_information[1][0][2]
-            apply_paragraph_style(cell_0_2.paragraphs[0], "00_BOLD")
-            set_font_size(cell_0_2, 9)
-
-
-    # Save the document after making changes
-    doc.save(finished_good)
+    try:
+        doc.save(finished_good)
+    except Exception as e:
+        print(f"Error saving document: {e}")
 
 
 # (3.2)
