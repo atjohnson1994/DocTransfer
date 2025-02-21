@@ -1,3 +1,4 @@
+# Import dependencies
 from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
@@ -8,7 +9,9 @@ from zipfile import ZipFile
 from docx.oxml import OxmlElement
 from docx.oxml import parse_xml
 
-# Style mapping: Source styles to destination styles
+# =============================== SECTION 1: Style mapping =============================================
+# Purpose: Defines the "style" for each paragraph based on the "style" in the original formatting.
+
 style_mapping = {
     "Heading 1": "Heading 1",
     "Heading 2": "Heading 2",
@@ -30,13 +33,26 @@ style_mapping = {
     '00_TEXT': '00_TEXT'
 }
 
-# Determine if a paragraph is part of a list
+
+# =============================== SECTION 2: Content Extraction =============================================
+# Purpose: Extract text, paragraph properties, images, tables, and header/footer from source document.
+# Functions: 2.1 : is_paragraph_in_list
+#            2.2 : extract_revision_text
+#            2.3 : extract_approval_text
+#            2.4 : extract_document_information
+#            2.5 : extract_content_with_details
+#            2.6 : extract_and_copy_tables
+#            2.7 : extract_images_from_docx
+
+# (2.1) Determine if a paragraph is part of a list
 def is_paragraph_in_list(paragraph):
     """Check if a paragraph is part of a bullet or numbered list by inspecting its XML properties."""
     num_pr = paragraph._p.xpath('.//w:numPr')
     return bool(num_pr)
 
-# Extract revision text
+
+
+# (2.2) Extract revision text
 def extract_revision_text(source_doc_path, first_cell_text="Revision History"):
 
     source_doc = Document(source_doc_path)
@@ -47,7 +63,9 @@ def extract_revision_text(source_doc_path, first_cell_text="Revision History"):
 
     return None  # Return None if no matching table is found
 
-# Extract approval text
+
+
+# (2.3) Extract approval text
 def extract_approval_text(source_doc_path, first_cell_text="Approval Table"):
 
     source_doc = Document(source_doc_path)
@@ -59,8 +77,7 @@ def extract_approval_text(source_doc_path, first_cell_text="Approval Table"):
     return None  # Return None if no matching table is found
 
 
-
-
+# (2.4)
 def extract_document_information(source_doc_path):
     doc = Document(source_doc_path)
 
@@ -91,102 +108,12 @@ def extract_document_information(source_doc_path):
     return [header_content, footer_content]
 
 
-# Input title, doc number, revision
-def input_document_information(finished_good, doc_information):
-    doc = Document(finished_good)
-
-
-    # Locate header and footer
-    for section in doc.sections:
-        header = section.header
-        footer = section.footer
-
-
-        for table in header.tables:
-            # Set text and apply styles without duplicating the content
-            cell_0_5 = table.cell(0, 5)
-            cell_0_5.text = doc_information[0][0][5]
-            apply_paragraph_style(cell_0_5.paragraphs[0], "00_BOLD")
-            center_cell_content(cell_0_5)
-
-
-            cell_1_4 = table.cell(1, 4)
-            cell_1_4.text = doc_information[0][1][4]
-            apply_paragraph_style(cell_1_4.paragraphs[0], "00_BOLD")
-            center_cell_content(cell_1_4)
-
-
-            cell_2_3 = table.cell(2, 3)
-            cell_2_3.text = doc_information[0][2][3]
-            apply_paragraph_style(cell_2_3.paragraphs[0], "00_HEADER")
-            center_cell_content(cell_2_3)
-
-
-            cell_3_0 = table.cell(3, 0)
-            cell_3_0.text = doc_information[0][3][0]
-            apply_paragraph_style(cell_3_0.paragraphs[0], "00_HEADER TITLE")
-            center_cell_content(cell_3_0)
-       
-        for table in footer.tables:
-            # Set text and apply styles without duplicating the content
-            cell_0_2 = table.cell(0, 2)
-            cell_0_2.text = doc_information[1][0][2]
-            apply_paragraph_style(cell_0_2.paragraphs[0], "00_BOLD")
-            set_font_size(cell_0_2, 9)
-
-
-    # Save the document after making changes
-    doc.save(finished_good)
-
-
-def apply_paragraph_style(paragraph, style_name):
-    try:
-        # Try applying a paragraph style directly
-        paragraph.style = style_name
-    except ValueError:
-        # If it's a character style, apply it to the run
-        if len(paragraph.runs) > 0:
-            run = paragraph.runs[0]  # Use the first run
-            run.style = style_name  # Apply character style to the run
-        else:
-            # If no runs exist, add a run and apply the style
-            run = paragraph.add_run(paragraph.text)
-            run.style = style_name
-
-
-def center_cell_content(cell):
-    # Center the content of each paragraph in the cell
-    for paragraph in cell.paragraphs:
-        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-
-def set_font_size(cell, font_size):
-    """Set the font size of all runs in the cell's paragraphs."""
-    for paragraph in cell.paragraphs:
-        for run in paragraph.runs:
-            run.font.size = Pt(font_size)
-
-
+# (2.5)
 def extract_content_with_details(source_doc_path):
     source_doc = Document(source_doc_path)
     content = []
-
-
-
-
-
-
-
-
     paragraph_idx = 0  # Index to track paragraphs
     table_idx = 0      # Index to track tables
-
-
-
-
-
-
-
 
     for block in source_doc.element.body:
         if block.tag.endswith("p"):  # Paragraph
@@ -228,22 +155,156 @@ def extract_content_with_details(source_doc_path):
                 })
                 table_idx += 1
 
-
-
-
-
-
-
-
     return content
 
 
+# (2.6)
+def extract_and_copy_tables(source_doc_path, output_folder):
+    # Open the source document
+    source_doc = Document(source_doc_path)
 
 
-# Function to input approvals and revision history
+    # Create a new destination document
+    dest_doc = Document()
+
+
+    # Iterate over each table in the source document and copy it to the destination document
+    for table in source_doc.tables:
+        # Copy the table's XML and append it to the destination document
+        table_xml = table._element.xml  # Extract full table XML
+        new_table = parse_xml(table_xml)  # Parse into new table object
+        dest_doc._element.body.append(new_table)  # Append to the document
+
+
+    # Get the original document name and append "_supplemental_tables"
+    base_name = os.path.splitext(os.path.basename(source_doc_path))[0][:6]
+    destination_doc_name = f"{base_name}_supplemental_tables.docx"
+    destination_doc_path = os.path.join(output_folder, destination_doc_name)
+
+
+    # Save the destination document
+    dest_doc.save(destination_doc_path)
+    print(f"Tables extracted and saved to {destination_doc_path}")
+
+
+# (2.7)
+def extract_images_from_docx(docx_path, output_dir):
+    """Extract images from a DOCX file and save them to a specified output directory."""
+    os.makedirs(output_dir, exist_ok=True)
+
+
+    # Open the DOCX file as a ZIP archive
+    with ZipFile(docx_path, 'r') as docx_zip:
+        # Extract all the relationships to identify the images
+        for file in docx_zip.namelist():
+            if file.startswith('word/media/'):
+                # Extract the image file
+                image_name = file.split('/')[-1]
+                image_data = docx_zip.read(file)
+
+
+                # Save the image to the output directory
+                image_path = os.path.join(output_dir, image_name)
+                with open(image_path, 'wb') as img_file:
+                    img_file.write(image_data)
+                print(f"Extracted image: {image_name}")
+
+
+# =============================== SECTION 3: Document Creation =============================================
+# Purpose: Transfer all extracted content into new template, apply formatting and styling, then save.
+# Functions: 3.1 : input_document_information
+#            3.2 : apply_paragraph_style
+#            3.3 : center_cell_content
+#            3.4 : set_font_size
+#            3.5 : input_approvals_revisions_text
+#            3.6 : write_content_with_existing_styles
+#            3.7 : italicize_and_resize_caption_style
+#            3.8 : insert_images_by_filename
+
+# (3.1) Input title, doc number, revision
+def input_document_information(finished_good, doc_information):
+    doc = Document(finished_good)
+
+
+    # Locate header and footer
+    for section in doc.sections:
+        header = section.header
+        footer = section.footer
+
+
+        for table in header.tables:
+            # Set text and apply styles without duplicating the content
+            cell_0_5 = table.cell(0, 5)
+            cell_0_5.text = doc_information[0][0][5]
+            apply_paragraph_style(cell_0_5.paragraphs[0], "00_BOLD")
+            center_cell_content(cell_0_5)
+
+
+            cell_1_4 = table.cell(1, 4)
+            cell_1_4.text = doc_information[0][1][4]
+            apply_paragraph_style(cell_1_4.paragraphs[0], "00_BOLD")
+            center_cell_content(cell_1_4)
+
+
+            cell_2_3 = table.cell(2, 3)
+            cell_2_3.text = doc_information[0][2][3]
+            apply_paragraph_style(cell_2_3.paragraphs[0], "00_HEADER")
+            center_cell_content(cell_2_3)
+
+
+            cell_3_0 = table.cell(3, 0)
+            cell_3_0.text = doc_information[0][3][0]
+            apply_paragraph_style(cell_3_0.paragraphs[0], "00_HEADER TITLE")
+            center_cell_content(cell_3_0)
+
+        for table in footer.tables:
+            # Set text and apply styles without duplicating the content
+            cell_0_2 = table.cell(0, 2)
+            cell_0_2.text = doc_information[1][0][2]
+            apply_paragraph_style(cell_0_2.paragraphs[0], "00_BOLD")
+            set_font_size(cell_0_2, 9)
+
+
+    # Save the document after making changes
+    doc.save(finished_good)
+
+
+# (3.2)
+def apply_paragraph_style(paragraph, style_name):
+    try:
+        # Try applying a paragraph style directly
+        paragraph.style = style_name
+    except ValueError:
+        # If it's a character style, apply it to the run
+        if len(paragraph.runs) > 0:
+            run = paragraph.runs[0]  # Use the first run
+            run.style = style_name  # Apply character style to the run
+        else:
+            # If no runs exist, add a run and apply the style
+            run = paragraph.add_run(paragraph.text)
+            run.style = style_name
+
+
+# (3.3)
+def center_cell_content(cell):
+    # Center the content of each paragraph in the cell
+    for paragraph in cell.paragraphs:
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+
+# (3.4)
+def set_font_size(cell, font_size):
+    """Set the font size of all runs in the cell's paragraphs."""
+    for paragraph in cell.paragraphs:
+        for run in paragraph.runs:
+            run.font.size = Pt(font_size)
+
+
+
+# (3.5) Function to input approvals and revision history
 def input_approvals_revisions_text(finished_good, revision_history, approvals):
     doc = Document(finished_good)
-   
+
     approval_count = 0
     revision_count = 0
     tables_to_remove = []
@@ -279,22 +340,9 @@ def input_approvals_revisions_text(finished_good, revision_history, approvals):
     doc.save(finished_good)
 
 
-
-
-       
-
-
-
-
+# (3.6)
 def write_content_with_existing_styles(content, destination_doc_path, finished_good):
     dest_doc = Document(destination_doc_path)
-
-
-
-
-
-
-
 
     # Check if the required styles exist in the destination document
     for item in content:
@@ -305,36 +353,15 @@ def write_content_with_existing_styles(content, destination_doc_path, finished_g
                 if style_name not in style_names:
                     raise ValueError(f"Style '{style_name}' not found in destination document.")
 
-
-
-
-
-
-
-
     # Write the content in the same order
     for item in content:
         if item["type"] == "paragraph":
             style_name = style_mapping.get(item["style"], "00_TEXT")  # Default to '00_TEXT' if not mapped
             paragraph = dest_doc.add_paragraph(style=style_name)
 
-
-
-
-
-
-
-
             # Handle list paragraphs
             if item.get("is_list", False):
                 paragraph.style = "00_BULLET"  # Use mapped bullet list style
-
-
-
-
-
-
-
 
             # Write runs with formatting
             for run_data in item["runs"]:
@@ -342,26 +369,12 @@ def write_content_with_existing_styles(content, destination_doc_path, finished_g
                 run.bold = run_data["bold"]
                 run.italic = run_data["italic"]
 
-
-
-
-
-
-
-
         elif item["type"] == "table":
             # Add a table to the destination document
             table_data = item["data"]
             if table_data:
                 table = dest_doc.add_table(rows=0, cols=len(table_data[0]))
                 table.style = 'Table Grid'  # Use a default table style
-
-
-
-
-
-
-
 
                 # Populate table rows with styles
                 for row_data in table_data:
@@ -379,32 +392,13 @@ def write_content_with_existing_styles(content, destination_doc_path, finished_g
                         if dest_style != "00_TITLE TABLE":
                             cell.paragraphs[0].alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
                             cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-   
-
-
-
-
-
 
     # Save the modified document
     dest_doc.save(finished_good)
     print(f"Document saved to {finished_good}.")
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# (3.7)
 def italicize_and_resize_caption_style(finished_good):
     """Make all text with the 'Caption' style italicized and set font size to 9 in the DOCX document."""
     doc = Document(finished_good)
@@ -423,116 +417,16 @@ def italicize_and_resize_caption_style(finished_good):
 
 
 
-
-
-
-def extract_and_copy_tables(source_doc_path, output_folder):
-    # Open the source document
-    source_doc = Document(source_doc_path)
-
-
-    # Create a new destination document
-    dest_doc = Document()
-
-
-    # Iterate over each table in the source document and copy it to the destination document
-    for table in source_doc.tables:
-        # Copy the table's XML and append it to the destination document
-        table_xml = table._element.xml  # Extract full table XML
-        new_table = parse_xml(table_xml)  # Parse into new table object
-        dest_doc._element.body.append(new_table)  # Append to the document
-
-
-    # Get the original document name and append "_supplemental_tables"
-    base_name = os.path.splitext(os.path.basename(source_doc_path))[0][:6]
-    destination_doc_name = f"{base_name}_supplemental_tables.docx"
-    destination_doc_path = os.path.join(output_folder, destination_doc_name)
-
-
-    # Save the destination document
-    dest_doc.save(destination_doc_path)
-    print(f"Tables extracted and saved to {destination_doc_path}")
-
-
-
-
-
-
-
-
-
-
-def extract_images_from_docx(docx_path, output_dir):
-    """Extract images from a DOCX file and save them to a specified output directory."""
-    os.makedirs(output_dir, exist_ok=True)
-
-
-
-
-
-
-
-
-    # Open the DOCX file as a ZIP archive
-    with ZipFile(docx_path, 'r') as docx_zip:
-        # Extract all the relationships to identify the images
-        for file in docx_zip.namelist():
-            if file.startswith('word/media/'):
-                # Extract the image file
-                image_name = file.split('/')[-1]
-                image_data = docx_zip.read(file)
-
-
-
-
-
-
-
-
-                # Save the image to the output directory
-                image_path = os.path.join(output_dir, image_name)
-                with open(image_path, 'wb') as img_file:
-                    img_file.write(image_data)
-                print(f"Extracted image: {image_name}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# (3.8)
 def insert_images_by_filename(destination_docx_path, image_folder):
     """Insert images into the DOCX file above their corresponding 'Figure X' text."""
     doc = Document(destination_docx_path)
     paragraphs = doc.paragraphs
 
-
-
-
-
-
-
-
     # Get a sorted list of images in the folder
     image_files = sorted(
         [f for f in os.listdir(image_folder) if f.lower().endswith(('png', 'jpg', 'jpeg'))]
     )
-
-
-
-
-
-
-
 
     for image_file in image_files:
         # Extract the figure number from the filename (e.g., "image2.png" -> "2")
@@ -541,22 +435,8 @@ def insert_images_by_filename(destination_docx_path, image_folder):
             print(f"Skipping {image_file}: could not determine figure number.")
             continue
 
-
-
-
-
-
-
-
         figure_text = f"Figure {figure_number}"
         image_path = os.path.join(image_folder, image_file)
-
-
-
-
-
-
-
 
         # Search for the paragraph starting with "Figure X"
         for para in paragraphs:
@@ -570,23 +450,9 @@ def insert_images_by_filename(destination_docx_path, image_folder):
         else:
             print(f"Figure {figure_number} not found in the document. Skipping {image_file}.")
 
-
-
-
-
-
-
-
     # Save the updated document
     doc.save(destination_docx_path)
     print("Images inserted successfully!")
-
-
-
-
-
-
-
 
     # Delete all images in the folder after completing
     for image_file in image_files:
@@ -597,17 +463,8 @@ def insert_images_by_filename(destination_docx_path, image_folder):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
+#======================================= SECTION 4: Function Calls ============================================
+# Purpose: Call the functions from above to process all documents in the folder
 
 # Directory paths
 source_folder = 'Insert Non-Transferred Document Here'
@@ -615,106 +472,51 @@ destination_folder = 'resources/template.docx'
 output_folder = 'Transferred Document Will Be Here'
 image_folder = 'resources/extracted_images'
 
-
-
-
-
-
 # Function to process each document in the source folder
 def process_documents_in_folder():
     # Get all DOCX files in the source folder
     docx_files = [f for f in os.listdir(source_folder) if f.lower().endswith('.docx')]
 
-
-
-
-
-
-
-
     for docx_file in docx_files:
         source_doc_path = os.path.join(source_folder, docx_file)
-       
+        
         # Define the output path with the same name as the source file
         finished_good = os.path.join(output_folder, docx_file)
-
 
         # Extract Revision History
         revision_history = extract_revision_text(source_doc_path)
 
-
         # Save tables into supplemental document
         extract_and_copy_tables(source_doc_path, output_folder)
-           
+        
         # Extract Approvals Table
         approvals = extract_approval_text(source_doc_path)
-
-
-       
+        
         # Extract content from the source document
         content = extract_content_with_details(source_doc_path)
-       
+        
         # Extract document information
         doc_information = extract_document_information(source_doc_path)
-        #print(doc_information[0][1][4])
+        
         # Write content with styles to destination document
         write_content_with_existing_styles(content, destination_folder, finished_good)
-
-
-
 
         # Input revision and approvals
         input_approvals_revisions_text(finished_good, revision_history, approvals)
 
-
         # Input document information
         input_document_information(finished_good, doc_information)
-
-
-
-
-
 
         # Italicize and resize caption style
         italicize_and_resize_caption_style(finished_good)
 
-
-       
-
-
-
-
         # Extract images from source DOCX
         extract_images_from_docx(source_doc_path, image_folder)
-
-
-
-
-
-
-
 
         # Insert images into the destination document
         insert_images_by_filename(finished_good, image_folder)
 
-
-
-
-
-
-
-
         print(f"Processed {docx_file} and saved to {finished_good}")
-
-
-
-
-
-
-
 
 # Call the function to process the documents
 process_documents_in_folder()
-
-
-
